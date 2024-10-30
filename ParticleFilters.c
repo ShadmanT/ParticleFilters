@@ -32,6 +32,8 @@
 
 #include "ParticleFilters.h"
 #include <math.h>
+#include <stdbool.h>
+
 
 
 /**********************************************************
@@ -309,6 +311,36 @@ struct particle *resample(void) {
     return new_list;
 }
 
+bool isCentralized(struct particle *list, double threshold) {
+    double mean_x = 0.0, mean_y = 0.0;
+    int count = 0;
+    struct particle *p = list;
+
+    // Calculate mean position of particles
+    while (p != NULL) {
+        mean_x += p->x;
+        mean_y += p->y;
+        count++;
+        p = p->next;
+    }
+    mean_x /= count;
+    mean_y /= count;
+
+    // Calculate variance
+    double variance_x = 0.0, variance_y = 0.0;
+    p = list;
+    while (p != NULL) {
+        variance_x += (p->x - mean_x) * (p->x - mean_x);
+        variance_y += (p->y - mean_y) * (p->y - mean_y);
+        p = p->next;
+    }
+    variance_x /= count;
+    variance_y /= count;
+
+    // Check if variances are below the threshold (indicating centralization)
+    return (variance_x < threshold && variance_y < threshold);
+}
+
 void ParticleFilterLoop(void)
 {
  /*
@@ -323,6 +355,8 @@ void ParticleFilterLoop(void)
   struct particle *p,*pmax;
   char line[1024];
   // Add any local variables you need right below.
+  
+  bool localizationAchieved = false;
 
   if (!first_frame)
   {
@@ -344,6 +378,12 @@ void ParticleFilterLoop(void)
    //        You should see a moving robot and sonar figure with
    //        a set of moving particles.
    ******************************************************************/
+    // Check if localization has already been achieved
+    if (localizationAchieved) {
+        fprintf(stderr, "Localization achieved! Stopping particle filter loop.\n");
+        return;  // Exit the loop
+    }
+
     struct particle *p = list;
     double move_distance = 1.0; // Define a small move distance for each particle
 
@@ -468,6 +508,11 @@ normalizeProbabilities(list);
   list = resample();
 
   // need to figure out if we achieved localization    
+  if (isCentralized(list, 0.2)) {  // Assume 1.0 is the threshold for centralization
+        localizationAchieved = true;  // Set the flag to stop the loop
+        fprintf(stderr, "I found myself!\n");
+        return;
+  }
 
   }  // End if (!first_frame)
 

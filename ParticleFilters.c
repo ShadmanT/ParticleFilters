@@ -261,7 +261,7 @@ void normalizeProbabilities(struct particle *list) {
     double total_prob = 0.0;
     struct particle *p = list;
 
-    // Calculate total probability
+    // Calculate total probability (sum of likelihoods)
     while (p != NULL) {
         total_prob += p->prob;
         p = p->next;
@@ -271,14 +271,13 @@ void normalizeProbabilities(struct particle *list) {
     p = list;
     while (p != NULL) {
         if (total_prob > 0) {
-            p->prob /= total_prob;
+            p->prob /= total_prob; // Normalize to convert likelihood to belief
         } else {
-            p->prob = 1.0;  // Handle edge case if all probabilities are zero
+            p->prob = 1.0 / n_particles;  // Handle edge case if all probabilities are zero
         }
         p = p->next;
     }
 }
-
 
 void ParticleFilterLoop(void)
 {
@@ -362,20 +361,18 @@ void ParticleFilterLoop(void)
 
   // Step 3: Compute the likelihood for each particle
   //struct particle *p = list;
-  double total_likelihood = 0.0; // To keep track of total likelihood for normalization
+struct particle *p = list; // Start from the head of the list
 
-  while (p != NULL) {
-      // Calculate the likelihood for each particle based on the robot's measurement
-      computeLikelihood(p, robot, 20.0); // Assume noise_sigma = 20
+while (p != NULL) {
+    // Calculate the likelihood for each particle based on the robot's measurement
+    computeLikelihood(p, robot, 20.0); // Assume noise_sigma = 20
 
-      // Accumulate the total likelihood
-      total_likelihood += p->prob;
+    // Move to the next particle in the list
+    p = p->next;
+}
 
-      // Move to the next particle in the list
-      p = p->next;
-  }
-
-  normalizeProbabilities(p);
+// Now normalize all likelihoods to convert them to beliefs
+normalizeProbabilities(list);
    // Step 4 - Resample particle set based on the probabilities. The goal
    //          of this is to obtain a particle set that better reflect our
    //          current belief on the location and direction of motion

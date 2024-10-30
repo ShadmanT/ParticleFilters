@@ -279,6 +279,36 @@ void normalizeProbabilities(struct particle *list) {
     }
 }
 
+struct particle *resample(void) {
+    // construct a new list of particles
+    struct particle *new_list = NULL;
+
+    for (int i = 0; i < n_particles; i++) {
+        double cumulative_prob = 0.0;
+        double r = rand() / (double)RAND_MAX;  // Random number between 0 and 1
+
+        struct particle *p = list;
+        while (p != NULL) {
+            cumulative_prob += p->prob;
+            if (cumulative_prob >= r) {
+                // Copy the particle to the new list
+                struct particle *new_particle = (struct particle*)malloc(sizeof(struct particle));
+                new_particle->x = p->x;
+                new_particle->y = p->y;
+                new_particle->theta = p->theta;
+                new_particle->prob = 1.0 / n_particles;  // Initialize with uniform probability
+                new_particle->next = new_list;
+                new_list = new_particle;
+                break;
+            }
+            p = p->next;
+        }
+    }
+
+    deleteList(list);  // Free memory for the old list
+    return new_list;
+}
+
 void ParticleFilterLoop(void)
 {
  /*
@@ -322,9 +352,25 @@ void ParticleFilterLoop(void)
         move(p, move_distance);
 
         // Check if particle hits a wall, and "bounce" if so
-        if (hit(p, map, sx, sy)) {
-            // Assign a random direction if it hits a wall
-            p->theta = ((double)rand() / RAND_MAX) * 360.0;
+        // if (hit(p, map, sx, sy)) {
+        //     // Assign a random direction if it hits a wall
+        //     p->theta = ((double)rand() / RAND_MAX) * 360.0;
+        // }
+
+        if(hit(p, map, sx, sy)) {
+            int validTheta = 0;
+            while (!validTheta) {
+                double oldx = p->x;
+                double oldy = p->y;
+                p->theta = ((double)rand() / RAND_MAX) * 360.0;
+                move(p, move_distance);
+                if (!hit(p, map, sx, sy)) {
+                    validTheta = 1;
+                } else {
+                    p->x = oldx;
+                    p->y = oldy;
+                }
+            }
         }
 
         // Update the particle's expected measurement (ground truth)
@@ -336,6 +382,22 @@ void ParticleFilterLoop(void)
 
     // Move the robot forward the same distance
     move(robot, move_distance);
+    
+    if (hit(robot, map, sx, sy)) {
+        int validTheta = 0;
+        while (!validTheta) {
+            double oldx = robot->x;
+            double oldy = robot->y;
+            robot->theta = ((double)rand() / RAND_MAX) * 360.0;
+            move(robot, move_distance);
+            if (!hit(robot, map, sx, sy)) {
+                validTheta = 1;
+            } else {
+                robot->x = oldx;
+                robot->y = oldy;
+            }
+        }
+    }
 
     // // Update the robot's actual sonar measurement
     // sonar_measurement(robot, map, sx, sy);
@@ -361,7 +423,7 @@ void ParticleFilterLoop(void)
 
   // Step 3: Compute the likelihood for each particle
   //struct particle *p = list;
-struct particle *p = list; // Start from the head of the list
+p = list; // Start from the head of the list
 
 while (p != NULL) {
     // Calculate the likelihood for each particle based on the robot's measurement
@@ -403,6 +465,9 @@ normalizeProbabilities(list);
    //        Hopefully the largest cluster will be on and around
    //        the robot's actual location/direction.
    *******************************************************************/
+  list = resample();
+
+  // need to figure out if we achieved localization    
 
   }  // End if (!first_frame)
 

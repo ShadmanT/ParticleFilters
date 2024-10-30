@@ -50,6 +50,9 @@ int windowID;               	// Glut window ID (for display)
 int Win[2];                 	// window (x,y) size
 int RESETflag;			// RESET particles
 
+int iterations;
+bool localizationAchieved;
+
 /**********************************************************
  PROGRAM CODE
 **********************************************************/
@@ -112,6 +115,8 @@ int main(int argc, char *argv[])
  
 
  // INITIALIZE the robot at a random location and orientation.
+ iterations = 1;
+ localizationAchieved = false;
  fprintf(stderr,"Init robot...\n");
  robot=initRobot(map,sx,sy);
  if (robot==NULL)
@@ -308,6 +313,27 @@ struct particle *resample(void) {
     }
 
     deleteList(list);  // Free memory for the old list
+
+    // uniformly randomize upto 5% of the particles (less if higher iterations)
+    int num_random = n_particles * 0.05 * (1.0 / (iterations/100.0));
+    for (int i = 0; i < num_random; i++) {
+        struct particle *p = new_list;
+        int random_particle = rand() % n_particles;
+        for (int j = 0; j < random_particle; j++) {
+            p = p->next;
+        }
+
+        int validPosition = 0;
+        while(!validPosition) {
+            p->x = rand() % sx;
+            p->y = rand() % sy;
+            p->theta = ((double)rand() / RAND_MAX) * 360.0;
+            if (!hit(p, map, sx, sy)) {
+                validPosition = 1;
+            }
+        }
+    }
+
     return new_list;
 }
 
@@ -338,6 +364,7 @@ bool isCentralized(struct particle *list, double threshold) {
     variance_y /= count;
 
     // Check if variances are below the threshold (indicating centralization)
+    // printf("Variance x: %f, Variance y: %f\n", variance_x, variance_y);
     return (variance_x < threshold && variance_y < threshold);
 }
 
@@ -354,9 +381,9 @@ void ParticleFilterLoop(void)
   double max;
   struct particle *p,*pmax;
   char line[1024];
+
+  iterations += n_particles / 1000;  // Increase iterations by 1 every 1000 particles
   // Add any local variables you need right below.
-  
-  bool localizationAchieved = false;
 
   if (!first_frame)
   {
@@ -378,12 +405,6 @@ void ParticleFilterLoop(void)
    //        You should see a moving robot and sonar figure with
    //        a set of moving particles.
    ******************************************************************/
-    // Check if localization has already been achieved
-    if (localizationAchieved) {
-        fprintf(stderr, "Localization achieved! Stopping particle filter loop.\n");
-        return;  // Exit the loop
-    }
-
     struct particle *p = list;
     double move_distance = 1.0; // Define a small move distance for each particle
 
@@ -508,10 +529,10 @@ normalizeProbabilities(list);
   list = resample();
 
   // need to figure out if we achieved localization    
-  if (isCentralized(list, 0.2)) {  // Assume 1.0 is the threshold for centralization
+  if (!localizationAchieved && isCentralized(list, 100)) {  // Assume 1.0 is the threshold for centralization
         localizationAchieved = true;  // Set the flag to stop the loop
         fprintf(stderr, "I found myself!\n");
-        return;
+        // return;
   }
 
   }  // End if (!first_frame)
